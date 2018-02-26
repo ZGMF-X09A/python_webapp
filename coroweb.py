@@ -135,6 +135,34 @@ class RequestHandler(object):
             # 若存在可变路由：/a/{name}/c,可匹配path为：/a/jack/c的request
             # 则request.match_info返回{name = jack}
             kw = dict(**request.match_info)
+        else: # request有canshu
+            if self._has_named_kw_args and (not self._has_var_kw_arg): # 若视图函数中只有命名关键字参数，没有关键字参数
+                copy = dict()
+                # 只保留命名关键字参数
+                for name in self._named_kw_args:
+                    if name in kw:
+                        copy[name] = kw[name]
+                    kw = copy # kw中只存在命名关键字参数
+                # 将request.match_info中的参数传入kw
+                for k, v in request.match_info.items():
+                # 检查kw中的参数是否和match_info中的重复
+                    if k in kw:
+                        logging.warn('Duplicate are name in named arg and kw args: %s' % k)
+                    kw[k] = v 
+            if self._has_request_arg: # 视图函数存在request参数
+                kw['request'] = request
+            if self._required_kw_args: # 视图函数存在无默认值的命名关键字参数
+                for name in self._required_kw_args:
+                    if not name in kw: #若未传入必须参数值，报错
+                        return web.HTTPBadRequest('Missing arguement: %s' % name)
+            # 至此，kw为视图函数fn真正能调用的参数
+            # request请求中的参数，终于传递给了视图函数
+            logging.info('call with args: %s' % str(kw))
+            # try:
+            r = await self._func(**kw)
+            return r 
+            # except APIError as e:
+                # return dict(error=e.error, data=e.data, message=e.message)
     
 # 编写add_route函数，用来注册一个URL处理函数：
 def add_route(app, fn):
