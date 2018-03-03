@@ -4,4 +4,7 @@ from urllib import parse
 
 from aiohttp import web
 
-help(getattr)
+import pymysql
+
+
+pymysql.connect(db='base', user='root', passwd='123456', host='localhost', port=3306)

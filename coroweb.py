@@ -71,7 +71,7 @@ def has_named_kw_args(fn):  # 判断是否有命名关键字参数
 def has_var_kw_arg(fn):  # 判断是否有关键字参数
     params = inspect.signature(fn).parameters
     for name, param in params.items():
-        if param.kind = inspect.Parameter.VAR_KEYWORD:
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
             return True
             
 def has_request_arg(fn):  # 判断是否有叫'request'的参数，且位置在最后
@@ -135,32 +135,78 @@ class RequestHandler(object):
             # 若存在可变路由：/a/{name}/c,可匹配path为：/a/jack/c的request
             # 则request.match_info返回{name = jack}
             kw = dict(**request.match_info)
+        else: # request有canshu
+            if self._has_named_kw_args and (not self._has_var_kw_arg): # 若视图函数中只有命名关键字参数，没有关键字参数
+                copy = dict()
+                # 只保留命名关键字参数
+                for name in self._named_kw_args:
+                    if name in kw:
+                        copy[name] = kw[name]
+                    kw = copy # kw中只存在命名关键字参数
+                # 将request.match_info中的参数传入kw
+                for k, v in request.match_info.items():
+                # 检查kw中的参数是否和match_info中的重复
+                    if k in kw:
+                        logging.warn('Duplicate are name in named arg and kw args: %s' % k)
+                    kw[k] = v 
+            if self._has_request_arg: # 视图函数存在request参数
+                kw['request'] = request
+            if self._required_kw_args: # 视图函数存在无默认值的命名关键字参数
+                for name in self._required_kw_args:
+                    if not name in kw: #若未传入必须参数值，报错
+                        return web.HTTPBadRequest('Missing arguement: %s' % name)
+            # 至此，kw为视图函数fn真正能调用的参数
+            # request请求中的参数，终于传递给了视图函数
+            logging.info('call with args: %s' % str(kw))
+            # try:
+            r = await self._func(**kw)
+            return r 
+            # except APIError as e:
+                # return dict(error=e.error, data=e.data, message=e.message)
     
 # 编写add_route函数，用来注册一个URL处理函数：
 def add_route(app, fn):
     method = getattr(fn, '__method__', None)
     path = getattr(fn, '__route__', None)
     if mothod is None or route is None:
-        raise ValueError('@get or @psot not defined in %s.' % str(fn))
+        raise ValueError('@get or @psot not defined in %s.' % fn.__name__)
+	# 判断URL处理函数是否是协程或是生成器
     if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
+		# 将fn转变成协程
         fn = asyncio.coroutine(fn)
     logging.info('add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
+    # 在app中注册经RequestHandler类封装的视图函数
     app.router.add_route(method, path, RequestHandler(app, fn))
     
 # 自动扫描完成多次add_route()注册的调用:
 def add_routes(app, module_name):
     n = module_name.rfind('.')
     if n == (-1):
+		# __import__ 作用同import语句，但__import__是一个函数，只接收字符串作为参数
+		# __import__('os', globals(), locals(), ['path', 'pip'], 0),等价于from os import path, pip
         mod = __import__(module_name, globals(), locals())
     else:
         name = module_name[n+1:]
         mod = getattr(__import__(module_name[:n], globals(), locals(), [name]), name)
-    for attr in dir(mod):
+    for attr in dir(mod): #dir()迭代出mod模块中所有的类，实例及函数等对象，str形式
         if attr.startswith('_'):
-            continue
+            continue # 忽略'_'开头的对象，直接继续for循环
         fn = getattr(mod, attr)
+		# 确保是函数
         if callable(fn):
+			# 确保视图函数中存在method和path
             method = getattr(fn, '__method__', None)
             path = getattr(fn, '__route__', None)
             if method and path:
+				# 注册
                 add_route(app, fn)
+				
+# 编写add_static函数用于注册静态文件，只提供文件路径即可进行注册
+# 添加静态文件，如image,css,javascript等
+def add_static(app):
+	# 拼接static文件目录
+	path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+	# path = os.path.join(os.path.abspath('.'), 'static')
+	
+	app.router.add_static('/static/', path)
+	logging.info('add static %s => %s' % ('/static/', path))
