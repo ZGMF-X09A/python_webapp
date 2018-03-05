@@ -168,7 +168,7 @@ class RequestHandler(object):
 def add_route(app, fn):
     method = getattr(fn, '__method__', None)
     path = getattr(fn, '__route__', None)
-    if mothod is None or route is None:
+    if method is None or path is None:
         raise ValueError('@get or @psot not defined in %s.' % fn.__name__)
 	# 判断URL处理函数是否是协程或是生成器
     if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):

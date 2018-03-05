@@ -1,3 +1,7 @@
+'''
+JSON API definition.
+'''
+
 import json, logging, inspect, functools
 
 class APIError(Exception):

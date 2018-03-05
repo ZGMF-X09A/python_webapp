@@ -6,7 +6,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
 import orm
-from coroweb import add_route, add_static
+from coroweb import add_routes, add_static
 
 import logging
 logging.basicConfig(level = logging.INFO)
@@ -52,7 +52,7 @@ def init_jinja2(app, **kw):
 async def logger_factory(app, handler):
 	async def logger(request):
 		logging.info('Request: %s %s' % (request.method, request.path))
-		return await hander(request)
+		return await handler(request)
 	return logger
 
 # 处理视图函数返回值，制作response的middleware
@@ -128,7 +128,7 @@ def datetime_filter(t):
     
 # 通过127.0.0.1:9000访问：
 async def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www', password='www', db='awesome')
+    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='root', password='123456', db='test')
     app = web.Application(loop=loop, middlewares=[
         logger_factory, response_factory
     ])
