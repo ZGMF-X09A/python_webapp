@@ -6,4 +6,4 @@ from aiohttp import web
 
 import aiomysql, pymysql
 
-conn = pymysql.connect(db='test', user='root', passwd='123456', host='localhost')
+help(aiomysql.create_pool())
